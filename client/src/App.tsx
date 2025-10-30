@@ -69,6 +69,12 @@ export default function App() {
     <div className="app">
       <header>
         <h1>MuseAI</h1>
+        <div style={{ marginLeft: 'auto' }}>
+          <button onClick={() => {
+            try { localStorage.removeItem('auth_token'); } catch {}
+            if (typeof globalThis !== 'undefined') (globalThis as any).location.href = '/login';
+          }}>Logout</button>
+        </div>
       </header>
       <main>
         <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>

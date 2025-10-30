@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Howler } from 'howler';
-import { api, getSongs } from '../services/api';
+import { api, getSongs, getYouTubeRecommendations } from '../services/api';
 import type { Track } from '../types/music';
 
 type Props = {
@@ -11,6 +11,19 @@ type Props = {
   onCreatePlaylist: (name: string) => void;
 };
 
+async function buildList(input: string, payload: any): Promise<Track[]> {
+  let list: any[] = [];
+  try {
+    const yt = await getYouTubeRecommendations({ input, mood: payload?.mood, genre: payload?.genre, limit: 20 });
+    list = (yt || []).map(it => ({ title: it.title, artist: it.artist, albumArt: it.albumArt, provider: 'youtube', videoId: it.videoId, externalUrl: it.externalUrl }));
+  } catch {}
+  if (!list?.length) {
+    const local = await getSongs({ mood: payload?.mood, genre: payload?.genre });
+    list = (local || []).map(it => ({ ...it, provider: 'file' }));
+  }
+  return list as Track[];
+}
+
 export function VoiceControl({ onPlay, onPause, onSkip, onQueue, onCreatePlaylist }: Readonly<Props>) {
   const [supported, setSupported] = useState(false);
   const [listening, setListening] = useState(false);
@@ -18,6 +31,8 @@ export function VoiceControl({ onPlay, onPause, onSkip, onQueue, onCreatePlaylis
   const [error, setError] = useState<string>('');
   const [lastTranscript, setLastTranscript] = useState<string>('');
   const recognitionRef = useRef<any>();
+
+  
 
   useEffect(() => {
     const SpeechRecognition = (globalThis as any).webkitSpeechRecognition || (globalThis as any).SpeechRecognition;
@@ -27,16 +42,8 @@ export function VoiceControl({ onPlay, onPause, onSkip, onQueue, onCreatePlaylis
       recog.continuous = false;
       recog.interimResults = false;
       recog.lang = 'en-US';
-      recog.onstart = () => {
-        setStatus('Listening…');
-        setError('');
-      };
-      recog.onerror = (ev: any) => {
-        const msg = ev?.error || 'speech-error';
-        setError(`Speech error: ${msg}`);
-        setStatus('');
-        setListening(false);
-      };
+      recog.onstart = () => { setStatus('Listening…'); setError(''); };
+      recog.onerror = (ev: any) => { setError(`Speech error: ${ev?.error || 'speech-error'}`); setStatus(''); setListening(false); };
       recog.onresult = async (event: any) => {
         const transcript = Array.from(event.results).map((r: any) => r[0].transcript).join(' ');
         setLastTranscript(transcript);
@@ -47,34 +54,19 @@ export function VoiceControl({ onPlay, onPause, onSkip, onQueue, onCreatePlaylis
             const action = data?.action as string;
             const payload = data?.payload || {};
             if (action === 'play') {
-              const songs = await getSongs({ mood: payload.mood, genre: payload.genre });
-              if (songs?.length) {
-                onPlay(songs[0] as unknown as Track);
-                if (songs.length > 1) onQueue(songs.slice(1) as unknown as Track[]);
-              } else {
-                setError('No songs found for that mood/genre.');
-              }
-            } else if (action === 'pause') {
-              onPause();
-            } else if (action === 'skip') {
-              onSkip();
+              const list = await buildList(transcript, payload);
+              if (list?.length) { onPlay(list[0]); if (list.length > 1) onQueue(list.slice(1)); }
+              else setError('No songs found for that mood/genre.');
             } else if (action === 'queue') {
-              const songs = await getSongs({ mood: payload.mood, genre: payload.genre });
-              if (songs?.length) onQueue(songs as unknown as Track[]);
-              else setError('No songs found to queue.');
-            } else if (action === 'create_playlist') {
-              onCreatePlaylist(payload.playlistName || 'My Playlist');
-            }
+              const list = await buildList(transcript, payload);
+              if (list?.length) onQueue(list); else setError('No songs found to queue.');
+            } else if (action === 'pause') { onPause(); }
+            else if (action === 'skip') { onSkip(); }
+            else if (action === 'create_playlist') { onCreatePlaylist(payload.playlistName || 'My Playlist'); }
           })
-          .catch(() => {
-            console.error('AI interpret error');
-            setError('Could not contact AI service. Check server and VITE_API_URL.');
-          });
+          .catch(() => { console.error('AI interpret error'); setError('Could not contact AI service. Check server and VITE_API_URL.'); });
       };
-      recog.onend = () => {
-        setListening(false);
-        setStatus('');
-      };
+      recog.onend = () => { setListening(false); setStatus(''); };
       recognitionRef.current = recog;
     }
   }, [onPlay, onPause, onSkip, onQueue, onCreatePlaylist]);
@@ -82,23 +74,17 @@ export function VoiceControl({ onPlay, onPause, onSkip, onQueue, onCreatePlaylis
   const toggle = async () => {
     if (!supported) return;
     try {
-      if (listening) {
-        recognitionRef.current?.stop();
-        setListening(false);
-      } else {
+      if (listening) { recognitionRef.current?.stop(); setListening(false); }
+      else {
         setError('');
         navigator.mediaDevices?.getUserMedia?.({ audio: true })?.catch(() => {});
-  if ((Howler as any)?.ctx?.resume) { (Howler as any).ctx.resume().catch(() => {}); }
+        if ((Howler as any)?.ctx?.resume) { (Howler as any).ctx.resume().catch(() => {}); }
         recognitionRef.current?.abort?.();
         recognitionRef.current?.start();
         setListening(true);
         setStatus('Listening…');
       }
-    } catch (e: any) {
-      setError(`Failed to start speech recognition: ${e?.message || e}`);
-      setListening(false);
-      setStatus('');
-    }
+    } catch (e: any) { setError(`Failed to start speech recognition: ${e?.message || e}`); setListening(false); setStatus(''); }
   };
 
   return (
@@ -111,34 +97,22 @@ export function VoiceControl({ onPlay, onPause, onSkip, onQueue, onCreatePlaylis
       {lastTranscript && <p>Heard: “{lastTranscript}”</p>}
       {error && <p style={{ color: '#f87171' }}>{error}</p>}
 
-      {/* Fallback manual command */}
-      <ManualCommand onAction={(input) => {
-        setError('');
-        setStatus('');
-        setLastTranscript(input);
+      <ManualCommand onAction={async (input) => {
+        setError(''); setStatus(''); setLastTranscript(input);
         api.post('/ai/interpret', { transcript: input })
           .then(async ({ data }) => {
             const action = data?.action as string;
             const payload = data?.payload || {};
             if (action === 'play') {
-              const songs = await getSongs({ mood: payload.mood, genre: payload.genre });
-              if (songs?.length) {
-                onPlay(songs[0] as unknown as Track);
-                if (songs.length > 1) onQueue(songs.slice(1) as unknown as Track[]);
-              } else {
-                setError('No songs found for that mood/genre.');
-              }
-            } else if (action === 'pause') {
-              onPause();
-            } else if (action === 'skip') {
-              onSkip();
+              const list = await buildList(input, payload);
+              if (list?.length) { onPlay(list[0]); if (list.length > 1) onQueue(list.slice(1)); }
+              else setError('No songs found for that mood/genre.');
             } else if (action === 'queue') {
-              const songs = await getSongs({ mood: payload.mood, genre: payload.genre });
-              if (songs?.length) onQueue(songs as unknown as Track[]);
-              else setError('No songs found to queue.');
-            } else if (action === 'create_playlist') {
-              onCreatePlaylist(payload.playlistName || 'My Playlist');
-            }
+              const list = await buildList(input, payload);
+              if (list?.length) onQueue(list); else setError('No songs found to queue.');
+            } else if (action === 'pause') { onPause(); }
+            else if (action === 'skip') { onSkip(); }
+            else if (action === 'create_playlist') { onCreatePlaylist(payload.playlistName || 'My Playlist'); }
           })
           .catch(() => setError('Could not contact AI service. Check server and VITE_API_URL.'));
       }} />

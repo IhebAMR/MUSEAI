@@ -6,11 +6,32 @@ import { Song } from '../models/Song';
 
 const router = Router();
 
-// Mock songs if DB empty
+// Mock songs if DB empty (use reliable public-domain/sample sources)
 const mockSongs = [
-  { title: 'Ocean Breeze', artist: 'Ayla', url: 'https://www2.cs.uic.edu/~i101/SoundFiles/StarWars60.wav', albumArt: '', genre: 'ambient', moodTags: ['relaxing', 'calm'] },
-  { title: 'Night Drive', artist: 'Nova', url: 'https://www2.cs.uic.edu/~i101/SoundFiles/PinkPanther30.wav', albumArt: '', genre: 'synthwave', moodTags: ['focus', 'cool'] },
-  { title: 'Sunny Mornings', artist: 'Lumo', url: 'https://www2.cs.uic.edu/~i101/SoundFiles/ImperialMarch60.wav', albumArt: '', genre: 'acoustic', moodTags: ['happy', 'warm'] }
+  {
+    title: 'T-Rex Roar',
+    artist: 'MDN CC0',
+    url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3',
+    albumArt: '',
+    genre: 'ambient',
+    moodTags: ['relaxing', 'calm']
+  },
+  {
+    title: 'SoundHelix Song 1',
+    artist: 'SoundHelix',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+    albumArt: '',
+    genre: 'synthwave',
+    moodTags: ['focus', 'cool']
+  },
+  {
+    title: 'SoundHelix Song 2',
+    artist: 'SoundHelix',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+    albumArt: '',
+    genre: 'acoustic',
+    moodTags: ['happy', 'warm']
+  }
 ];
 
 router.get('/', async (req: Request, res: Response) => {

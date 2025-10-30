@@ -1,11 +1,12 @@
 import { useAtom } from 'jotai';
 import { useEffect, useState } from 'react';
+import { Howler } from 'howler';
 import { currentTrackAtom, isPlayingAtom, queueAtom } from './state/player';
-import { AudioPlayer } from './components/AudioPlayer';
+import UnifiedPlayer from './components/UnifiedPlayer';
 import { VoiceControl } from './components/VoiceControl';
 import { Playlist } from './components/Playlist';
 import type { Track } from './types/music';
-import { getSongs } from './services/api';
+import { getSongs, getYouTubeRecommendations } from './services/api';
 
 export default function App() {
   const [queue, setQueue] = useAtom(queueAtom);
@@ -30,7 +31,11 @@ export default function App() {
     setQueue(rest);
     setIsPlaying(true);
   };
-  const queueTracks = (tracks: Track[]) => setQueue([...queue, ...tracks]);
+  const queueTracks = (tracks: Track[]) => {
+    const byUrl = new Map<string, Track>();
+    for (const t of [...queue, ...tracks]) { if (t?.url) byUrl.set(t.url, t); }
+    setQueue(Array.from(byUrl.values()));
+  };
 
   // Preload a few tracks so "Play" can start immediately
   useEffect(() => {
@@ -79,11 +84,34 @@ export default function App() {
       <main>
         <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
           <button onClick={async () => {
-            const songs = await getSongs();
-            if (songs?.length) {
-              setCurrentTrack(songs[0] as any);
-              setQueue(songs.slice(1) as any);
-              setIsPlaying(true);
+            try { if ((Howler as any)?.ctx?.resume) { await (Howler as any).ctx.resume(); } } catch {}
+            // Prefer YouTube recommendations; fallback to local songs
+            try {
+              let list: any[] = [];
+              try {
+                const yt = await getYouTubeRecommendations({ input: 'chill lofi', mood: 'chill', limit: 10 });
+                list = (yt || []).map(it => ({ title: it.title, artist: it.artist, albumArt: it.albumArt, provider: 'youtube', videoId: it.videoId, externalUrl: it.externalUrl }));
+              } catch {}
+              if (!list?.length) {
+                const local = await getSongs();
+                list = (local || []).map(it => ({ ...it, provider: 'file' }));
+              }
+              if (list?.length) {
+                setCurrentTrack(list[0] as any);
+                const byUrl = new Map<string, any>();
+                for (const t of list.slice(1)) {
+                  const key = t.provider === 'youtube' && t.videoId ? `yt:${t.videoId}` : t.url;
+                  if (key) byUrl.set(key, t);
+                }
+                for (const t of queue) {
+                  const key = (t as any).provider === 'youtube' && (t as any).videoId ? `yt:${(t as any).videoId}` : (t as any).url;
+                  if (key) byUrl.set(key, t);
+                }
+                setQueue(Array.from(byUrl.values()) as any);
+                setIsPlaying(true);
+              }
+            } catch (e) {
+              console.error('Sample play error', e);
             }
           }}>Play sample</button>
           <button onClick={() => {
@@ -104,7 +132,7 @@ export default function App() {
           onQueue={(tracks: Track[]) => queueTracks(tracks)}
           onCreatePlaylist={(name: string) => console.log('Create playlist', name)}
         />
-        <AudioPlayer track={currentTrack} playing={isPlaying} onPlay={play} onPause={pause} onSkip={skip} />
+  <UnifiedPlayer track={currentTrack} playing={isPlaying} onPlay={play} onPause={pause} onSkip={skip} />
         <Playlist queue={queue} />
       </main>
     </div>

@@ -12,21 +12,44 @@ export function AudioPlayer({ track, playing, onPlay, onPause, onSkip }: Readonl
   const soundRef = useRef<Howl | null>(null);
 
   useEffect(() => {
-    if (!track) return;
+    if (!track || !track.url) return;
     if (soundRef.current) {
       soundRef.current.unload();
       soundRef.current = null;
     }
+    if (track?.url) {
+      console.log('[AudioPlayer] Loading track URL:', track.url);
+    }
     const howl = new Howl({
       src: [track.url],
       html5: true,
+      preload: true,
       onload: () => {
+        console.log('[AudioPlayer] onload');
         if (playing) {
           try { howl.play(); } catch {}
         }
       },
-      onplayerror: (_id, err) => { console.error('Audio play error', err); try { howl.once('unlock', () => howl.play()); } catch {} },
-      onloaderror: (_id, err) => { console.error('Audio load error', err); }
+      onplay: () => { console.log('[AudioPlayer] onplay'); },
+      onplayerror: (_id, err) => {
+        console.error('Audio play error', err);
+        try { howl.once('unlock', () => howl.play()); } catch {}
+        // Native fallback attempt
+        try {
+          const a = new Audio(track.url);
+          a.crossOrigin = 'anonymous';
+          a.play().catch(() => {});
+        } catch {}
+      },
+      onloaderror: (_id, err) => {
+        console.error('Audio load error', err);
+        // Native fallback attempt
+        try {
+          const a = new Audio(track.url);
+          a.crossOrigin = 'anonymous';
+          a.play().catch(() => {});
+        } catch {}
+      }
     });
     soundRef.current = howl;
     // If already marked as playing, attempt to play (onload will also handle)

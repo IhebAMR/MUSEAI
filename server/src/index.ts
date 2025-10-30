@@ -11,14 +11,27 @@ import songsRouter from './routes/songs';
 import playlistsRouter from './routes/playlists';
 import aiRouter from './routes/ai';
 import spotifyRouter from './routes/spotify';
+import youtubeRouter from './routes/youtube';
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 5001;
-const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
+const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173,https://museai.local:5173,http://museai.local:5173';
 const MEDIA_DIR = process.env.MEDIA_DIR || path.resolve(__dirname, '..', 'media');
 
-app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
+const allowedOrigins = CORS_ORIGIN.split(',').map(s => s.trim()).filter(Boolean);
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(null, false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Spotify-Token'],
+  exposedHeaders: ['Content-Type'],
+  optionsSuccessStatus: 200,
+}));
 app.use(express.json({ limit: '1mb' }));
 
 
@@ -35,6 +48,7 @@ app.use('/api/songs', songsRouter);
 app.use('/api/playlists', playlistsRouter);
 app.use('/api/ai', aiRouter);
 app.use('/api/spotify', spotifyRouter);
+app.use('/api/youtube', youtubeRouter);
 
 ;(async () => {
   await connectDB();

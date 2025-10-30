@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { api } from '../services/api';
+import { Howler } from 'howler';
+import { api, getSongs } from '../services/api';
 import type { Track } from '../types/music';
 
 type Props = {
@@ -41,19 +42,34 @@ export function VoiceControl({ onPlay, onPause, onSkip, onQueue, onCreatePlaylis
         setLastTranscript(transcript);
         setListening(false);
         setStatus('');
-        try {
-          const { data } = await api.post('/ai/interpret', { transcript });
-          const action = data?.action as string;
-          const payload = data?.payload || {};
-          if (action === 'play') onPlay();
-          else if (action === 'pause') onPause();
-          else if (action === 'skip') onSkip();
-          else if (action === 'queue') onQueue([]);
-          else if (action === 'create_playlist') onCreatePlaylist(payload.playlistName || 'My Playlist');
-        } catch (e) {
-          console.error('AI interpret error', e);
-          setError('Could not contact AI service. Check server and VITE_API_URL.');
-        }
+        api.post('/ai/interpret', { transcript })
+          .then(async ({ data }) => {
+            const action = data?.action as string;
+            const payload = data?.payload || {};
+            if (action === 'play') {
+              const songs = await getSongs({ mood: payload.mood, genre: payload.genre });
+              if (songs?.length) {
+                onPlay(songs[0] as unknown as Track);
+                if (songs.length > 1) onQueue(songs.slice(1) as unknown as Track[]);
+              } else {
+                setError('No songs found for that mood/genre.');
+              }
+            } else if (action === 'pause') {
+              onPause();
+            } else if (action === 'skip') {
+              onSkip();
+            } else if (action === 'queue') {
+              const songs = await getSongs({ mood: payload.mood, genre: payload.genre });
+              if (songs?.length) onQueue(songs as unknown as Track[]);
+              else setError('No songs found to queue.');
+            } else if (action === 'create_playlist') {
+              onCreatePlaylist(payload.playlistName || 'My Playlist');
+            }
+          })
+          .catch(() => {
+            console.error('AI interpret error');
+            setError('Could not contact AI service. Check server and VITE_API_URL.');
+          });
       };
       recog.onend = () => {
         setListening(false);
@@ -72,6 +88,7 @@ export function VoiceControl({ onPlay, onPause, onSkip, onQueue, onCreatePlaylis
       } else {
         setError('');
         navigator.mediaDevices?.getUserMedia?.({ audio: true })?.catch(() => {});
+  if ((Howler as any)?.ctx?.resume) { (Howler as any).ctx.resume().catch(() => {}); }
         recognitionRef.current?.abort?.();
         recognitionRef.current?.start();
         setListening(true);
@@ -95,22 +112,35 @@ export function VoiceControl({ onPlay, onPause, onSkip, onQueue, onCreatePlaylis
       {error && <p style={{ color: '#f87171' }}>{error}</p>}
 
       {/* Fallback manual command */}
-      <ManualCommand onAction={async (input) => {
+      <ManualCommand onAction={(input) => {
         setError('');
         setStatus('');
         setLastTranscript(input);
-        try {
-          const { data } = await api.post('/ai/interpret', { transcript: input });
-          const action = data?.action as string;
-          const payload = data?.payload || {};
-          if (action === 'play') onPlay();
-          else if (action === 'pause') onPause();
-          else if (action === 'skip') onSkip();
-          else if (action === 'queue') onQueue([]);
-          else if (action === 'create_playlist') onCreatePlaylist(payload.playlistName || 'My Playlist');
-        } catch (e) {
-          setError('Could not contact AI service. Check server and VITE_API_URL.');
-        }
+        api.post('/ai/interpret', { transcript: input })
+          .then(async ({ data }) => {
+            const action = data?.action as string;
+            const payload = data?.payload || {};
+            if (action === 'play') {
+              const songs = await getSongs({ mood: payload.mood, genre: payload.genre });
+              if (songs?.length) {
+                onPlay(songs[0] as unknown as Track);
+                if (songs.length > 1) onQueue(songs.slice(1) as unknown as Track[]);
+              } else {
+                setError('No songs found for that mood/genre.');
+              }
+            } else if (action === 'pause') {
+              onPause();
+            } else if (action === 'skip') {
+              onSkip();
+            } else if (action === 'queue') {
+              const songs = await getSongs({ mood: payload.mood, genre: payload.genre });
+              if (songs?.length) onQueue(songs as unknown as Track[]);
+              else setError('No songs found to queue.');
+            } else if (action === 'create_playlist') {
+              onCreatePlaylist(payload.playlistName || 'My Playlist');
+            }
+          })
+          .catch(() => setError('Could not contact AI service. Check server and VITE_API_URL.'));
       }} />
     </div>
   );
@@ -126,7 +156,7 @@ function ManualCommand({ onAction }: Readonly<{ onAction: (input: string) => voi
         onChange={(e) => setValue(e.target.value)}
         style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid #374151', background: '#111827', color: '#fff' }}
       />
-      <button className="mic" onClick={() => { if (value.trim()) onAction(value); }}>
+      <button className="mic" onClick={() => { if ((Howler as any)?.ctx?.resume) { (Howler as any).ctx.resume().catch(() => {}); } if (value.trim()) onAction(value); }}>
         Send
       </button>
     </div>

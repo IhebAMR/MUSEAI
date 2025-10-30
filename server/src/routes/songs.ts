@@ -11,16 +11,32 @@ const mockSongs = [
   { title: 'Sunny Mornings', artist: 'Lumo', url: 'https://www2.cs.uic.edu/~i101/SoundFiles/ImperialMarch60.wav', albumArt: '', genre: 'acoustic', moodTags: ['happy', 'warm'] }
 ];
 
-router.get('/', async (_req: Request, res: Response) => {
-  // If not connected to Mongo, return mock songs immediately
+router.get('/', async (req: Request, res: Response) => {
+  const { mood, genre } = req.query as { mood?: string; genre?: string };
+
+  // Helper to filter mocks when DB is not available
+  const filterMocks = () => {
+    let results = mockSongs;
+    if (genre) results = results.filter((s) => (s.genre || '').toLowerCase() === String(genre).toLowerCase());
+    if (mood) results = results.filter((s) => (s.moodTags || []).map((m) => m.toLowerCase()).includes(String(mood).toLowerCase()));
+    return results;
+  };
+
+  // If not connected to Mongo, return filtered mocks
   if (mongoose.connection.readyState !== 1) {
-    return res.json(mockSongs);
+    return res.json(filterMocks());
   }
+
+  const query: any = {};
+  if (genre) query.genre = new RegExp(`^${String(genre)}$`, 'i');
+  if (mood) query.moodTags = { $in: [new RegExp(`^${String(mood)}$`, 'i')] };
+
   const count = await Song.countDocuments();
   if (count === 0) {
-    return res.json(mockSongs);
+    return res.json(filterMocks());
   }
-  const songs = await Song.find().limit(100).lean();
+
+  const songs = await Song.find(query).limit(100).lean();
   res.json(songs);
 });
 

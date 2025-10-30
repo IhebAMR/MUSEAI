@@ -17,9 +17,22 @@ export function AudioPlayer({ track, playing, onPlay, onPause, onSkip }: Readonl
       soundRef.current.unload();
       soundRef.current = null;
     }
-    const howl = new Howl({ src: [track.url], html5: true });
+    const howl = new Howl({
+      src: [track.url],
+      html5: true,
+      onload: () => {
+        if (playing) {
+          try { howl.play(); } catch {}
+        }
+      },
+      onplayerror: (_id, err) => { console.error('Audio play error', err); try { howl.once('unlock', () => howl.play()); } catch {} },
+      onloaderror: (_id, err) => { console.error('Audio load error', err); }
+    });
     soundRef.current = howl;
-    if (playing) howl.play();
+    // If already marked as playing, attempt to play (onload will also handle)
+    if (playing) {
+      try { howl.play(); } catch {}
+    }
     return () => { howl.unload(); };
   }, [track?.url]);
 

@@ -13,6 +13,11 @@ npm run dev
 
 - Dev: http://localhost:5173
 
+## Spotify (optional)
+
+- Click "Connect Spotify" in the app header area. A popup will request Spotify authorization.
+- On success, tokens are stored in localStorage under `spotify_tokens` (scaffold only). A production app should store tokens securely on the server.
+
 ## Build
 
 ```bash

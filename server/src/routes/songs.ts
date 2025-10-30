@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import mongoose from 'mongoose';
+import fs from 'node:fs';
+import path from 'node:path';
 import { Song } from '../models/Song';
 
 const router = Router();
@@ -22,7 +24,43 @@ router.get('/', async (req: Request, res: Response) => {
     return results;
   };
 
-  // If not connected to Mongo, return filtered mocks
+  // 0) If a sources.json file exists, serve remote sources defined there
+  const MEDIA_DIR = process.env.MEDIA_DIR || path.resolve(__dirname, '..', '..', 'media');
+  const sourcesPath = path.join(MEDIA_DIR, 'sources.json');
+  if (fs.existsSync(sourcesPath)) {
+    try {
+      const raw = fs.readFileSync(sourcesPath, 'utf-8');
+      const list = JSON.parse(raw) as Array<{ title: string; artist: string; url: string; albumArt?: string; genre?: string; moodTags?: string[] }>;
+      if (Array.isArray(list) && list.length > 0) {
+        let items = list;
+        if (genre) items = items.filter((s) => (s.genre || '').toLowerCase() === String(genre).toLowerCase());
+        if (mood) items = items.filter((s) => (s.moodTags || []).map((m) => m.toLowerCase()).includes(String(mood).toLowerCase()));
+        if (items.length > 0) return res.json(items);
+      }
+    } catch {
+      // ignore malformed JSON and continue fallbacks
+    }
+  }
+
+  // 1) If there are local media files to serve, use those
+  if (fs.existsSync(MEDIA_DIR)) {
+    const files = fs.readdirSync(MEDIA_DIR).filter(f => /\.(mp3|ogg|wav)$/i.test(f));
+    if (files.length > 0) {
+      let local = files.map(f => ({
+        title: path.parse(f).name,
+        artist: 'Local',
+        url: `/media/${f}`,
+        albumArt: '',
+        genre: undefined,
+        moodTags: [] as string[]
+      }));
+      if (genre) local = local.filter(s => s.title.toLowerCase().includes(String(genre).toLowerCase()));
+      if (mood) local = local.filter(s => s.title.toLowerCase().includes(String(mood).toLowerCase()));
+      if (local.length > 0) return res.json(local);
+    }
+  }
+
+  // 2) If not connected to Mongo, return filtered mocks
   if (mongoose.connection.readyState !== 1) {
     return res.json(filterMocks());
   }

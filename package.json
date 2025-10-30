@@ -1,0 +1,8 @@
+{
+  "name": "museai-root",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Root meta package. Use client/ and server/ projects independently.",
+  "scripts": {},
+  "devDependencies": {}
+}

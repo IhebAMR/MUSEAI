@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'node:path';
 import fs from 'node:fs';
+import https from 'node:https';
+import { getAutoCert, getManualCert, getSelfSigned } from './utils/localHttps';
 import { connectDB } from './config/db';
 import authRouter from './routes/auth';
 import songsRouter from './routes/songs';
@@ -34,7 +36,34 @@ app.use('/api/playlists', playlistsRouter);
 app.use('/api/ai', aiRouter);
 app.use('/api/spotify', spotifyRouter);
 
-(async () => {
+;(async () => {
   await connectDB();
+  const httpsMode = (process.env.HTTPS_MODE || '').toLowerCase(); // 'off' | 'manual' | 'auto'
+  const httpsEnabled = (process.env.HTTPS_ENABLED || '').toLowerCase() === 'true';
+  const shouldHttps = httpsMode === 'auto' || httpsMode === 'manual' || httpsEnabled;
+  if (shouldHttps) {
+    let creds = null as null | { key: Buffer; cert: Buffer };
+    if (httpsMode === 'manual' || httpsEnabled) {
+      const keyPath = process.env.HTTPS_KEY_PATH || '';
+      const certPath = process.env.HTTPS_CERT_PATH || '';
+      creds = getManualCert(keyPath, certPath);
+    } else if (httpsMode === 'auto') {
+      const host = process.env.HTTPS_HOSTNAME || 'museai.local';
+      creds = await getAutoCert(host);
+      if (!creds) {
+        console.warn('[WARN] devcert failed; generating self-signed cert instead.');
+        creds = getSelfSigned(host);
+      }
+    }
+    if (creds) {
+      const host = process.env.HTTPS_HOSTNAME || 'localhost';
+      https.createServer({ key: creds.key, cert: creds.cert }, app).listen(PORT, () => {
+        console.log(`Server listening on https://${host}:${PORT}`);
+      });
+      return;
+    } else {
+      console.warn('[WARN] HTTPS requested but no credentials available. Falling back to HTTP.');
+    }
+  }
   app.listen(PORT, () => console.log(`Server listening on http://localhost:${PORT}`));
 })();

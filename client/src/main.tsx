@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import App from './App'
 import LoginPage from './pages/Login'
+import SpotifyCallback from './pages/SpotifyCallback'
 import './index.css'
 
 function RequireAuth({ children }: { readonly children: React.ReactNode }) {
@@ -16,6 +17,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+  <Route path="/spotify/callback" element={<SpotifyCallback />} />
         <Route path="/" element={<RequireAuth><App /></RequireAuth>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

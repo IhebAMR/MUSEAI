@@ -17,22 +17,7 @@ api.interceptors.request.use((config) => {
 	return config;
 });
 
-export type GetSongsParams = { mood?: string; genre?: string };
-export async function getSongs(params?: GetSongsParams) {
-	const { data } = await api.get('/songs', { params });
-	const items = data as Array<{ title: string; artist: string; url: string; albumArt?: string; genre?: string; moodTags?: string[] }>;
-	// Normalize relative URLs like /media/foo.mp3 to absolute server origin
-	return items.map((it) => {
-		const out = { ...it } as any;
-		if (typeof out.url === 'string' && out.url.startsWith('/')) {
-			out.url = serverOrigin.replace(/\/$/, '') + out.url;
-		}
-		if (typeof out.albumArt === 'string' && out.albumArt.startsWith('/')) {
-			out.albumArt = serverOrigin.replace(/\/$/, '') + out.albumArt;
-		}
-		return out;
-	});
-}
+// Removed local songs endpoint and static samples.
 
 // Spotify helpers
 export function getSpotifyAccessToken(): string | null {

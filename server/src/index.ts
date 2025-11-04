@@ -7,7 +7,6 @@ import https from 'node:https';
 import { getAutoCert, getManualCert, getSelfSigned } from './utils/localHttps';
 import { connectDB } from './config/db';
 import authRouter from './routes/auth';
-import songsRouter from './routes/songs';
 import playlistsRouter from './routes/playlists';
 import aiRouter from './routes/ai';
 import spotifyRouter from './routes/spotify';
@@ -44,7 +43,6 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/auth', authRouter);
-app.use('/api/songs', songsRouter);
 app.use('/api/playlists', playlistsRouter);
 app.use('/api/ai', aiRouter);
 app.use('/api/spotify', spotifyRouter);

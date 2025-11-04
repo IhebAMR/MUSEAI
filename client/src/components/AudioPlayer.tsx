@@ -22,7 +22,7 @@ export function AudioPlayer({ track, playing, onPlay, onPause, onSkip }: Readonl
     }
     const howl = new Howl({
       src: [track.url],
-      html5: true,
+      // Use WebAudio when available to enable visualization; Howler will fallback when needed
       preload: true,
       onload: () => {
         console.log('[AudioPlayer] onload');

@@ -1,6 +1,8 @@
 import YouTubePlayer from './YouTubePlayer';
 import { AudioPlayer } from './AudioPlayer';
 import type { Track } from '../types/music';
+import Visualizer from './Visualizer';
+import { likeTrack, dislikeTrack, skipTrack } from '../services/prefs';
 
 export default function UnifiedPlayer({ track, playing, onPlay, onPause, onSkip }: Readonly<{
   track?: Track | null;
@@ -22,8 +24,11 @@ export default function UnifiedPlayer({ track, playing, onPlay, onPause, onSkip 
             <div className="artist">{track.artist}</div>
           </div>
         </div>
+        <Visualizer playing={playing} />
         <div className="controls">
-          <button onClick={() => onSkip()}>Skip</button>
+          <button onClick={() => { if (track) dislikeTrack(track); }}>Dislike</button>
+          <button onClick={() => { if (track) likeTrack(track); }}>Like</button>
+          <button onClick={() => { if (track) { skipTrack(track); } onSkip(); }}>Skip</button>
           {playing ? (
             <button onClick={() => onPause()}>Pause</button>
           ) : (
@@ -34,5 +39,20 @@ export default function UnifiedPlayer({ track, playing, onPlay, onPause, onSkip 
     );
   }
   // Fallback to URL-based player
-  return <AudioPlayer track={track} playing={playing} onPlay={onPlay} onPause={onPause} onSkip={onSkip} />;
+  return (
+    <div>
+      <AudioPlayer track={track} playing={playing} onPlay={onPlay} onPause={onPause} onSkip={onSkip} />
+      <Visualizer playing={playing} />
+      <div className="controls">
+        <button onClick={() => { if (track) dislikeTrack(track); }}>Dislike</button>
+        <button onClick={() => { if (track) likeTrack(track); }}>Like</button>
+  <button onClick={() => { if (track) { skipTrack(track); } onSkip(); }}>Skip</button>
+        {playing ? (
+          <button onClick={() => onPause()}>Pause</button>
+        ) : (
+          <button onClick={() => onPlay(track)}>Play</button>
+        )}
+      </div>
+    </div>
+  );
 }

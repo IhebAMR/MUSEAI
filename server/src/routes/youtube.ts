@@ -58,6 +58,33 @@ router.get('/search', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/youtube/status - lightweight health check
+router.get('/status', async (_req: Request, res: Response) => {
+  const key = getKey();
+  if (!key) return res.json({ ok: false, keyPresent: false, error: 'YOUTUBE_API_KEY missing' });
+  try {
+    // Use a minimal query with maxResults=1
+    const params = new URLSearchParams({
+      key,
+      part: 'id',
+      type: 'video',
+      maxResults: '1',
+      q: 'music',
+    });
+    const url = `https://www.googleapis.com/youtube/v3/search?${params.toString()}`;
+    const r = await fetch(url);
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      const status = r.status;
+      const message = (j as any)?.error?.message || 'yt_status_failed';
+      return res.json({ ok: false, keyPresent: true, status, error: message });
+    }
+    res.json({ ok: true, keyPresent: true });
+  } catch (e: any) {
+    res.json({ ok: false, keyPresent: true, error: e?.message || String(e) });
+  }
+});
+
 // GET /api/youtube/recommend?input=&mood=&genre=&limit=&region=
 router.get('/recommend', async (req: Request, res: Response) => {
   try {

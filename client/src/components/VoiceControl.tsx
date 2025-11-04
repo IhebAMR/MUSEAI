@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Howler } from 'howler';
-import { api, getSongs, getYouTubeRecommendations } from '../services/api';
+import { api, getYouTubeRecommendations } from '../services/api';
+import { rankTracks } from '../utils/rank';
 import type { Track } from '../types/music';
 
 type Props = {
@@ -12,16 +13,13 @@ type Props = {
 };
 
 async function buildList(input: string, payload: any): Promise<Track[]> {
-  let list: any[] = [];
   try {
     const yt = await getYouTubeRecommendations({ input, mood: payload?.mood, genre: payload?.genre, limit: 20 });
-    list = (yt || []).map(it => ({ title: it.title, artist: it.artist, albumArt: it.albumArt, provider: 'youtube', videoId: it.videoId, externalUrl: it.externalUrl }));
-  } catch {}
-  if (!list?.length) {
-    const local = await getSongs({ mood: payload?.mood, genre: payload?.genre });
-    list = (local || []).map(it => ({ ...it, provider: 'file' }));
+    const list = (yt || []).map(it => ({ title: it.title, artist: it.artist, albumArt: it.albumArt, provider: 'youtube', videoId: it.videoId, externalUrl: it.externalUrl })) as Track[];
+    return rankTracks(list);
+  } catch {
+    return [];
   }
-  return list as Track[];
 }
 
 export function VoiceControl({ onPlay, onPause, onSkip, onQueue, onCreatePlaylist }: Readonly<Props>) {
